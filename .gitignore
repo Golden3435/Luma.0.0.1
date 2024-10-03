@@ -1,18 +1,134 @@
-# This .gitignore is appropriate for repositories deployed to GitHub Pages and using
-# a Gemfile as specified at https://github.com/github/pages-gem#conventional
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luma IDE</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css">
+    <style>
+        body {
+            display: flex;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+            margin: 0;
+        }
+        #editor {
+            width: 50%;
+            border-right: 1px solid #ccc;
+            overflow-y: auto;
+        }
+        #output {
+            width: 50%;
+            height: 100%;
+            padding: 10px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+        }
+        .CodeMirror {
+            height: 100%;
+        }
+        #fileName {
+            margin-bottom: 10px;
+        }
+        button {
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
 
-# Basic Jekyll gitignores (synchronize to Jekyll.gitignore)
-_site/
-.sass-cache/
-.jekyll-cache/
-.jekyll-metadata
+<div id="editor">
+    <h2>Code Editor</h2>
+    <input type="text" id="fileName" placeholder="File name (without extension)">
+    <button id="saveBtn">Save</button>
+    <button id="loadBtn">Load</button>
+    <h3>Luma</h3>
+    <textarea id="luma"></textarea>
+    <button id="runBtn">Run</button>
+</div>
 
-# Additional Ruby/bundler ignore for when you run: bundle install
-/vendor
+<div id="output">
+    <h2>Output</h2>
+    <iframe id="outputFrame" style="width: 100%; height: 90%; border: none;"></iframe>
+</div>
 
-# Specific ignore for GitHub Pages
-# GitHub Pages will always use its own deployed version of pages-gem 
-# This means GitHub Pages will NOT use your Gemfile.lock and therefore it is
-# counterproductive to check this file into the repository.
-# Details at https://github.com/github/pages-gem/issues/768
-Gemfile.lock
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/xml/xml.min.js"></script>
+<script>
+    const lumaEditor = CodeMirror.fromTextArea(document.getElementById('luma'), {
+        mode: "text/plain",
+        lineNumbers: true,
+        indentUnit: 4,
+        tabSize: 4,
+        theme: "default",
+        autoCloseBrackets: true,
+        styleActiveLine: true,
+        matchBrackets: true
+    });
+
+    lumaEditor.on('keypress', function(cm, event) {
+        const cursor = cm.getCursor();
+        const line = cm.getLine(cursor.line);
+        
+        if (line.trim() === "<luma>") {
+            if (event.key === 'Enter') {
+                cm.replaceRange("\n    </luma>", { line: cursor.line + 1, ch: 0 });
+                cm.setCursor(cursor.line + 1, 4); // Move cursor to the start of the indented line
+                event.preventDefault(); // Prevent default Enter behavior
+            }
+        }
+    });
+
+    document.getElementById('runBtn').onclick = function() {
+        const lumaCode = lumaEditor.getValue();
+        const htmlCode = lumaToHtml(lumaCode);
+
+        const outputFrame = document.getElementById('outputFrame');
+        const output = outputFrame.contentDocument || outputFrame.contentWindow.document;
+
+        output.open();
+        output.write(htmlCode);
+        output.close();
+    };
+
+    function lumaToHtml(luma) {
+        return luma
+            .replace(/<luma>/g, '<html><head><title>')
+            .replace(/<\/luma>/g, '</title></head><body>')
+            .replace(/<style>(.*?)<\/style>/g, '<style>$1</style>')
+            .replace(/<content>/g, '')
+            .replace(/<\/content>/g, '')
+            .replace(/<header>/g, '<h1>')
+            .replace(/<\/header>/g, '</h1>')
+            .replace(/<paragraph>/g, '<p>')
+            .replace(/<\/paragraph>/g, '</p>')
+            .replace(/<ball>/g, '<div class="ball">')
+            .replace(/<\/ball>/g, '</div>')
+            .replace(/<animate>(.*?)<\/animate>/g, (match, content) => {
+                return `<style>
+                    @keyframes customAnimation {
+                        ${content}
+                    }
+                </style>`;
+            })
+            + '</body></html>';
+    }
+
+    document.getElementById('saveBtn').onclick = function() {
+        const fileName = document.getElementById('fileName').value || "myFile";
+        const fileContent = { luma: lumaEditor.getValue() };
+        localStorage.setItem(fileName, JSON.stringify(fileContent));
+        alert(`File ${fileName}.json saved!`);
+    };
+
+    document.getElementById('loadBtn').onclick = function() {
+        const fileName = document.getElementById('fileName').value || "myFile";
+        const fileContent = localStorage.getItem(fileName);
+        const content = JSON.parse(fileContent);
+        lumaEditor.setValue(content.luma);
+        alert(`File ${fileName}.json loaded!`);
+    };
+</script>
+
+</body>
+</html>
